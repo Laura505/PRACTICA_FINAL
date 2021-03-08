@@ -49,9 +49,11 @@
           </div>
 
           <div data-dojo-type="dijit.layout.ContentPane" data-dojo-props="title:'Tareas'" >
-            Operaciones
             <button id="pintaYQuery" type="button">Seleccionar ciudades</button>
-            <div class="divGrid" id="divGrid"></div> 
+            <button id="OffpintaYQuery" type="button">Borrar Selección</button>
+            <div id="Grid" data-dojo-type="dijit.layout.TabContainer">
+              <div id="TableNode"></div>
+            </div>   
           </div>
 
         </div>

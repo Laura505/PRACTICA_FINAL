@@ -1,5 +1,5 @@
     var map;
-    var tb;
+    var tbDraw;
         require(["esri/map",
             "esri/geometry/Extent" ,
             "esri/layers/ArcGISDynamicMapServiceLayer",
@@ -11,6 +11,7 @@
             "esri/dijit/OverviewMap", 
 
             "esri/layers/FeatureLayer",
+            "esri/dijit/FeatureTable",
             "esri/toolbars/draw" ,
             "esri/graphic" ,
             "esri/graphicsUtils",
@@ -25,8 +26,17 @@
             "esri/symbols/SimpleMarkerSymbol",
             "esri/Color",
 
+            "dojo/ready",
+            "dojo/parser",
             "dojo/on",
-            "dojo/dom",
+            "dojo/dom",   
+
+            "dojo/_base/Color",                             
+            "dojo/_base/declare",
+            "dojo/_base/array",                             
+    
+            "dgrid/OnDemandGrid",
+            "dgrid/Selection",
 
             "dijit/TitlePane",
             "dijit/layout/TabContainer",
@@ -34,19 +44,114 @@
             "dijit/layout/BorderContainer",
             "dojo/domReady!"],
             function(
-            Map, Extent, ArcGISDynamicMapServiceLayer, BasemapGallery, Scalebar, Legend, Search, OverviewMap, FeatureLayer, Draw, Graphic, graphicsUtils, Query, Popup, PopupTemplate, InfoTemplate, SimpleFillSymbol, SimpleLineSymbol, SimpleMarkerSymbol, Color, 
-            on, dom,
+            Map, Extent, ArcGISDynamicMapServiceLayer, BasemapGallery, Scalebar, Legend, Search, OverviewMap, FeatureLayer, FeatureTable, Draw, Graphic, graphicsUtils, Query, Popup, PopupTemplate, InfoTemplate, SimpleFillSymbol, SimpleLineSymbol, SimpleMarkerSymbol, Color, ready, parser, 
+            on, dom, Color, declare, array,
+            Grid, Selection,
 
             ) {
 
+        //SELECCIONAR CIUDADES
+        on(dojo.byId("pintaYQuery"),"click",fPintaYQuery);
+        
+
+        //selección Ciudades
+        function fPintaYQuery(){
+            tbDraw = new Draw(map);
+            tbDraw.on("draw-complete",displayPolygon);
+            tbDraw.activate(Draw.POLYGON);
+          }
+          
+        function displayPolygon(evt) {
+            var geometryInput = evt.geometry;
+            var tbDrawSymbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID, new SimpleLineSymbol(SimpleLineSymbol.STYLE_DASHDOT, new Color([255, 255, 0]), 2), new Color([255, 255, 0, 0.2]));
+            
+            //borrar poligonos
+            map.graphics.clear();
+
+            //añadir capa grafica al mapa
+            var graphicPolygon = new Graphic(geometryInput, tbDrawSymbol);
+            map.graphics.add(graphicPolygon);
+            selectCities(geometryInput);
+          }      
+
+            //Simbolo seleccion de Ciudades
+        function selectCities(geometryInput) {
+            var symbolSelected = new SimpleMarkerSymbol({
+              "type": "esriSMS",
+              "style": "esriSMSCircle",
+              "color": [255, 0, 0, 128],
+              "size": 8,
+              "outline": {"color": [255, 225, 0, 214],
+                      "width": 1}
+            });
+            Ciudades.setSelectionSymbol(symbolSelected);
+            
+            //selección segun area
+            var queryCities = new Query();
+            queryCities.geometry = geometryInput;
+            //
+            Ciudades.on("selection-complete");
+            Ciudades.selectFeatures(queryCities,FeatureLayer.SELECTION_NEW, function(features){
+              TablaCities.filterSelectRecords()
+
+            });
+          }        
+        
+          on(dojo.byId("OffpintaYQuery"),"click", OffpintaYQuery);
+          function OffpintaYQuery(){
+            map.graphics.clear();
+            Ciudades.clearSelection()
+            map.setExtent(Extent)
+          };
+          on(dojo.byId("OffpintaYQuery"),"click",offCities);
+    
+          function offCities (){
+            Ciudades.clearSelection();
+            map.graphics.clear();
+            TablaCities.clearFilter()
+            tbDraw.deactivate()
+          }
+        
+          
+
+        
+
+        // Boton "Ir al Estado"
+        on(dojo.byId("progButtonNode"), "click",function (){
+            
+         
+          var inputState = dojo.byId("dtb").value; 
+          
+          //Simbologia del estado 
+          var sbState = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID,
+            new SimpleLineSymbol(SimpleLineSymbol.STYLE_DASHDOT,
+            new Color([255,0,0]), 2),new Color([255,255,0,0.5])
+          );
+          
+          //asignamos simbologia
+          states.setSelectionSymbol(sbState);
+          
+          //Consulta
+          var queryState = new Query();
+          queryState.where = `state_name = '${inputState}'`; 
+          
+          states.selectFeatures(queryState, FeatureLayer.SELECTION_NEW, function (selection){
+            // Zoom al estado seleccionado
+            var centerSt = graphicsUtils.graphicsExtent(selection).getCenter();
+            var extentSt = esri.graphicsExtent(selection);
+            
+            map.setExtent(extentSt.getExtent().expand(2));
+            map.centerAt(centerSt);
+          });
+        
+          
+        });
+        
 
         
         
-
         
-        
-        
-        //empiezo
+        //extensión
 
         var Extent = new Extent({
           
@@ -86,16 +191,19 @@
           map.on("zoom",function(evt){
             popup.hide()
           });
+
         //Añado los mapas de USA
       
         var lyrUSA = new ArcGISDynamicMapServiceLayer("http://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer", {
             opacity : 0.5
         });
-        var Ciudades = new FeatureLayer("http://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/0");
+        var Ciudades = new FeatureLayer("http://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/0", {
+          outFields:["st", "areaname","class", "pop2000"],
+        });
         
         var states = new FeatureLayer("http://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/2", {
-          infoTemplate: popupStates, //llama la ventana emergente
-          outFields:["*"] //llama a todos los campos de la capa
+          infoTemplate: popupStates, 
+          outFields:["state_name", "state_abbr", "pop2000", "pop00_sqmi", "ss6.gdb.States.area"] 
         });
         
         map.on("load",function(evt){
@@ -141,94 +249,35 @@
           }, "VGeneral");
           OverviewMap.startup();
 
-        //COPIO
-        on(dojo.byId("pintaYQuery"),"click",fPintaYQuery);
+        Ciudades.on("load", function(){
+          TablaCities =  new FeatureTable({
+            featureLayer : Ciudades,
+            map : map,
+            outFields:["st", "areaname","class", "pop2000"],
+            syncSelection: true,
+            zoomToSelection:true,
+            fieldInfos: [
+              {
+                name: 'st',
+                alias: 'Estado'
+              },
+              {
+                name: 'areaname',
+                alias: 'Ciudad'
+              },{
+                name: 'class',
+                alias: 'Clase'
+              },{
+                name: 'pop2000',
+                alias: 'Habitantes'
+              }],
+            }, "TableNode");
+            
+            TablaCities.startup();
+          })   
         
 
-        //selección Ciudades
-        function fPintaYQuery(){
-            var tbDraw = new Draw(map);
-            tbDraw.on("draw-complete",displayPolygon);
-            tbDraw.activate(Draw.POLYGON);
-          }
-          
-        function displayPolygon(evt) {
-            var geometryInput = evt.geometry;
-            var tbDrawSymbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID, new SimpleLineSymbol(SimpleLineSymbol.STYLE_DASHDOT, new Color([255, 255, 0]), 2), new Color([255, 255, 0, 0.2]));
-            
-            //borrar poligonos
-            map.graphics.clear();
-
-            //añadir capa grafica al mapa
-            var graphicPolygon = new Graphic(geometryInput, tbDrawSymbol);
-            map.graphics.add(graphicPolygon);
-            selectCities(geometryInput);
-          }      
-
-            //simbolo seleccion
-        function selectCities(geometryInput) {
-            var symbolSelected = new SimpleMarkerSymbol({
-              "type": "esriSMS",
-              "style": "esriSMSCircle",
-              "color": [255, 0, 0, 128],
-              "size": 8,
-              "outline": {"color": [255, 225, 0, 214],
-                      "width": 1}
-            });
-            Ciudades.setSelectionSymbol(symbolSelected);
-            
-            //selección segun area
-            var queryCities = new Query();
-            queryCities.geometry = geometryInput;
-            //
-            Ciudades.on("selection-complete",populateGrid);
-            Ciudades.selectFeatures(queryCities,FeatureLayer.SELECTION_NEW);
-          }        
-        function populateGrid(results) {               
-            var gridData;
-            dataCities = array.map(results.features, function (feature) {
-               return {"st": feature.attributes[outFieldsCities[0]],
-                        "areaname": feature.attributes[outFieldsCities[1]],
-                        "pop2000": feature.attributes[outFieldsCities[2]],
-                      }
-             });
-            var memStore = new Memory({
-              data: dataCities
-            });
-            gridCities.set("store", memStore);
-            
-          }
-
-        // Boton "Ir al Estado"
-        on(dojo.byId("progButtonNode"), "click",function (){
-            
-         
-          var inputState = dojo.byId("dtb").value; 
-          
-          //Simbologia del estado 
-          var sbState = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID,
-            new SimpleLineSymbol(SimpleLineSymbol.STYLE_DASHDOT,
-            new Color([255,0,0]), 2),new Color([255,255,0,0.5])
-          );
-          
-          //asignamos simbologia
-          states.setSelectionSymbol(sbState);
-          
-          //Consulta
-          var queryState = new Query();
-          queryState.where = `state_name = '${inputState}'`; 
-          
-          states.selectFeatures(queryState, FeatureLayer.SELECTION_NEW, function (selection){
-            // Zoom al estado seleccionado
-            var centerSt = graphicsUtils.graphicsExtent(selection).getCenter();
-            var extentSt = esri.graphicsExtent(selection);
-            
-            map.setExtent(extentSt.getExtent().expand(2));
-            map.centerAt(centerSt);
-          });
         
-          
-        });
 
 
       });

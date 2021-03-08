@@ -40,7 +40,17 @@
         color:#3f3f3f;
         border: solid 2px #224a54;
         width:20%;
-     }
+      }
+     .divGrid {
+      position: relative;
+      top: 15px;
+      color: #3f3f3f;
+      border-radius: 4px;
+      border: #224a54;
+      font-size:small;
+      background-color: rgb(192, 192, 192);
+
+      }
 
       #footer {
         margin: 2px;
@@ -75,4 +85,8 @@
         top: 20px;
         right: 20px;
         z-index: 50;}
+
+        
+        
+        
      
